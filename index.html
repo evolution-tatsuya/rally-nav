@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>ラリーナビ</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0e131c">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root{--bg:#0e131c;--panel:#182030;--line:#2a3548;--text:#f2f5fa;--mute:#8e9bb3;--blue:#2f6bff;--red:#e0432d;--ok:#4fc27a;--warn:#f2b441}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:"Hiragino Sans","Noto Sans JP",system-ui,sans-serif;overflow:hidden}
+  #app{display:flex;flex-direction:column;height:100%;min-height:100vh;padding-top:env(safe-area-inset-top)}
+  /* --- head: the thing you glance at --- */
+  #head{background:var(--panel);border-bottom:1px solid var(--line);padding:10px 14px 8px}
+  #turn{display:flex;align-items:center;gap:14px}
+  #arrow{width:88px;height:88px;flex:none;display:grid;place-items:center}
+  #arrow svg{width:88px;height:88px;fill:none;stroke:var(--text);stroke-width:9;stroke-linecap:round;stroke-linejoin:round}
+  #tdist{font-size:52px;font-weight:700;line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  #tdist small{font-size:20px;font-weight:500;color:var(--mute);margin-left:3px}
+  #tlabel{font-size:15px;color:var(--mute);margin-top:4px}
+  #sub{display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:15px}
+  #cpnext b{font-size:20px;font-variant-numeric:tabular-nums}
+  #speed{font-variant-numeric:tabular-nums;color:var(--mute)}#speed b{color:var(--text);font-size:20px}
+  #eta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:12px}
+  #eta .k{display:block;color:var(--mute)}#eta b{font-size:20px;font-variant-numeric:tabular-nums;display:block;line-height:1.2}
+  #eta .late{color:var(--red)}#eta .early{color:var(--ok)}
+  #cptimes .opt{padding:8px 0}#cptimes input[type=time]{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;font-size:16px}
+  #alert{display:none;background:var(--red);color:#fff;font-weight:700;text-align:center;padding:10px;font-size:18px}
+  #alert.on{display:block}
+  #map{flex:1}
+  /* --- foot --- */
+  #foot{background:var(--panel);border-top:1px solid var(--line);padding:8px 10px calc(8px + env(safe-area-inset-bottom));display:flex;gap:8px;align-items:center}
+  button{background:var(--line);color:var(--text);border:0;border-radius:10px;padding:12px 14px;font:inherit;font-size:15px;font-weight:600;flex:1}
+  button.primary{background:var(--blue);color:#fff}
+  button.stop{background:var(--red);color:#fff}
+  button.small{flex:none;padding:12px 12px;font-weight:500}
+  button:disabled{opacity:.4}
+  /* --- sheet --- */
+  #sheet{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(14,19,28,.96);z-index:2000;display:flex;flex-direction:column;padding:calc(16px + env(safe-area-inset-top)) 16px 16px;overflow:auto}
+  #sheet h1{font-size:20px;margin:0 0 4px}
+  #sheet p{color:var(--mute);font-size:13px;line-height:1.6;margin:0 0 12px}
+  .rt{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;font-size:15px}
+  .rt .grow{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rt.sel{border-color:var(--blue)}
+  .opt{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line);font-size:15px}
+  .opt select,.opt input[type=number]{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit}
+  .row{display:flex;gap:8px;margin-top:10px}
+  #status{font-size:13px;color:var(--mute);margin-top:10px;min-height:20px}
+  .leaflet-container{background:#0e131c}
+  .car{width:22px;height:22px;border-radius:50%;background:var(--warn);border:3px solid #fff;box-shadow:0 0 0 4px rgba(242,180,65,.35)}
+  .cp{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;color:#fff;font-size:12px;font-weight:700;border:2px solid #fff}
+  .cp.done{opacity:.35}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="head">
+    <div id="turn">
+      <div id="arrow"><svg viewBox="0 0 100 100"><path id="apath" d="M50 85 V25 M30 45 L50 25 L70 45"/></svg></div>
+      <div>
+        <div id="tdist">--<small>m</small></div>
+        <div id="tlabel">ルートを選んで開始</div>
+      </div>
+    </div>
+    <div id="sub">
+      <div id="cpnext">次のTC：<b>--</b></div>
+      <div id="speed"><b>0</b> km/h</div>
+    </div>
+    <div id="eta">
+      <div><span class="k">次のTC 到着</span><b id="eta-cp">--:--</b><span id="eta-cpd" class="k"></span></div>
+      <div><span class="k">ゴール 到着</span><b id="eta-goal">--:--</b><span id="eta-goald" class="k"></span></div>
+      <div><span class="k">経過</span><b id="elapsed">0:00</b><span class="k" id="avgspd"></span></div>
+    </div>
+  </div>
+  <div id="alert">ルートを外れています</div>
+  <div id="map"></div>
+  <div id="foot">
+    <button id="btn-menu" class="small">ルート</button>
+    <button id="btn-follow" class="small">追従</button>
+    <button id="btn-start" class="primary" disabled>開始</button>
+  </div>
+
+  <div id="sheet">
+    <h1>ラリーナビ</h1>
+    <p>GPXファイル（ルート作成ツールで保存したもの）を開いて開始します。RALLYSTREAMは別の端末か裏で動かしたままで大丈夫です。</p>
+    <div class="row"><button id="btn-file" class="primary">GPXを開く</button><input type="file" id="file" accept=".gpx,application/gpx+xml,application/xml,text/xml" style="display:none"></div>
+    <div id="routes"></div>
+    <div style="margin-top:14px">
+      <div class="opt"><span>走る向き</span><select id="dir"><option value="fwd">記録された順</option><option value="rev">反転する</option></select></div>
+      <div class="opt"><span>案内する距離</span><select id="pre"><option value="500">500 m 手前</option><option value="300">300 m 手前</option><option value="1000">1 km 手前</option></select></div>
+      <div class="opt"><span>逸脱とみなす距離</span><select id="offd"><option value="40">40 m</option><option value="60">60 m</option><option value="100">100 m</option></select></div>
+      <div class="opt"><span>到着予想に使う速度（走行データが溜まるまで）</span><select id="assume"><option value="30">30 km/h</option><option value="40" selected>40 km/h</option><option value="50">50 km/h</option><option value="60">60 km/h</option></select></div>
+      <div class="opt"><span>試運転（ルート上を自動走行）</span><input type="checkbox" id="sim"></div>
+    </div>
+    <div style="margin-top:14px">
+      <div style="font-weight:600;margin-bottom:4px">TC指定時刻（任意）</div>
+      <p>入れておくと、到着予想との差（余裕／遅れ）を表示します。</p>
+      <div id="cptimes"></div>
+    </div>
+    <div style="margin-top:14px">
+      <div style="font-weight:600;margin-bottom:4px">走行ログ</div>
+      <p>案内中は走った軌跡を自動で記録します。ルートなしで記録だけすることもできます（下見に便利）。</p>
+      <div class="row"><button id="btn-logonly" class="small">記録だけ開始</button><button id="btn-savelog" class="small" disabled>ログを保存（GPX）</button></div>
+      <div id="loginfo" style="font-size:13px;color:var(--mute);margin-top:6px"></div>
+    </div>
+    <div class="row"><button id="btn-voice" class="small">音声テスト</button><button id="btn-go" class="primary" disabled>このルートで始める</button></div>
+    <div id="status"></div>
+  </div>
+</div>
+
+<script>
+// ================= state =================
+const S={route:null, name:'', pts:[], cum:[], mans:[], cps:[], idx:0, running:false, follow:true,
+  offCount:0, off:false, watch:null, sim:null, simD:0, lastPos:null, lastT:0, wake:null, hist:[], startAt:0, targets:{}, log:[], logOnly:false};
+const $=id=>document.getElementById(id);
+
+// ================= map =================
+const map=L.map('map',{zoomControl:false,attributionControl:false}).setView([35.2,135.95],11);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+const line=L.polyline([],{color:'#2f6bff',weight:6,opacity:.9}).addTo(map);
+const doneLine=L.polyline([],{color:'#5b6b8a',weight:6,opacity:.7}).addTo(map);
+const cpLayer=L.layerGroup().addTo(map);
+const car=L.marker([0,0],{icon:L.divIcon({className:'',html:'<div class="car"></div>',iconSize:[22,22],iconAnchor:[11,11]})});
+map.on('dragstart',()=>{S.follow=false;$('btn-follow').style.opacity=.5;});
+$('btn-follow').onclick=()=>{S.follow=true;$('btn-follow').style.opacity=1;if(S.lastPos)map.setView(S.lastPos,16);};
+
+// ================= geo helpers =================
+const toRad=d=>d*Math.PI/180;
+function distM(a,b){const dLat=toRad(b[0]-a[0]),dLng=toRad(b[1]-a[1]);const h=Math.sin(dLat/2)**2+Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(dLng/2)**2;return 12742000*Math.asin(Math.sqrt(h));}
+function bearing(a,b){const y=Math.sin(toRad(b[1]-a[1]))*Math.cos(toRad(b[0]));const x=Math.cos(toRad(a[0]))*Math.sin(toRad(b[0]))-Math.sin(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.cos(toRad(b[1]-a[1]));return (Math.atan2(y,x)*180/Math.PI+360)%360;}
+// local metric frame for projection
+let K={kx:1,ky:1,o:[0,0]};
+const toXY=p=>[(p[1]-K.o[1])*K.kx,(p[0]-K.o[0])*K.ky];
+function projectToSeg(p,a,b){const P=toXY(p),A=toXY(a),B=toXY(b);const dx=B[0]-A[0],dy=B[1]-A[1];const L2=dx*dx+dy*dy;let t=L2?((P[0]-A[0])*dx+(P[1]-A[1])*dy)/L2:0;t=Math.max(0,Math.min(1,t));const X=A[0]+t*dx,Y=A[1]+t*dy;return {t,d:Math.hypot(P[0]-X,P[1]-Y)};}
+function simplify(pts,tol){if(pts.length<3)return pts.map((_,i)=>i);const P=pts.map(toXY);const keep=new Uint8Array(pts.length);keep[0]=keep[pts.length-1]=1;const st=[[0,pts.length-1]];
+  while(st.length){const [a,b]=st.pop();let md=0,mi=-1;const[ax,ay]=P[a],[bx,by]=P[b];const L2=(bx-ax)**2+(by-ay)**2;
+    for(let i=a+1;i< b;i++){let t=L2?((P[i][0]-ax)*(bx-ax)+(P[i][1]-ay)*(by-ay))/L2:0;t=Math.max(0,Math.min(1,t));const d=Math.hypot(P[i][0]-(ax+t*(bx-ax)),P[i][1]-(ay+t*(by-ay)));if(d>md){md=d;mi=i;}}
+    if(md>tol){keep[mi]=1;st.push([a,mi],[mi,b]);}}
+  const out=[];keep.forEach((k,i)=>k&&out.push(i));return out;}
+
+// ================= GPX =================
+function parseGPX(txt){
+  const doc=new DOMParser().parseFromString(txt,'application/xml');
+  const pts=[...doc.getElementsByTagName('trkpt')].map(e=>[+e.getAttribute('lat'),+e.getAttribute('lon')]);
+  const cps=[...doc.getElementsByTagName('wpt')].map(e=>({lat:+e.getAttribute('lat'),lng:+e.getAttribute('lon'),
+    name:e.getElementsByTagName('name')[0]?.textContent||'ポイント',type:e.getElementsByTagName('type')[0]?.textContent||'OTHER'}));
+  if(pts.length<2) throw new Error('トラックが入っていません');
+  return {pts,cps};
+}
+function prepare(){
+  let pts=S.route.pts.slice(); if($('dir').value==='rev') pts.reverse();
+  K={o:pts[0],kx:111320*Math.cos(toRad(pts[0][0])),ky:110540};
+  const cum=[0]; for(let i=1;i< pts.length;i++) cum.push(cum[i-1]+distM(pts[i-1],pts[i]));
+  S.pts=pts; S.cum=cum;
+  // maneuvers from simplified vertices
+  const keep=simplify(pts,12); const mans=[];
+  for(let k=1;k< keep.length-1;k++){const i=keep[k],a=pts[keep[k-1]],b=pts[i],c=pts[keep[k+1]];
+    let dv=bearing(b,c)-bearing(a,b); dv=((dv+540)%360)-180; const ad=Math.abs(dv); if(ad<35) continue;
+    const m={i,at:cum[i],dir:dv>0?'R':'L',kind:ad>150?'U':ad>100?'sharp':ad>60?'turn':'slight',said500:false,said100:false};
+    if(mans.length&&m.at-mans[mans.length-1].at<25){ mans[mans.length-1]=m; continue; } // merge close ones
+    mans.push(m);}
+  S.mans=mans;
+  // checkpoints projected onto track
+  S.cps=S.route.cps.map(c=>{let best={d:1e9,at:0};for(let i=1;i< pts.length;i++){const r=projectToSeg([c.lat,c.lng],pts[i-1],pts[i]);if(r.d< best.d)best={d:r.d,at:cum[i-1]+r.t*(cum[i]-cum[i-1])};}
+    return {...c,at:best.at,said:false,passed:false};}).sort((a,b)=>a.at-b.at);
+  renderCpTimes();
+  // draw
+  line.setLatLngs(pts); doneLine.setLatLngs([]); cpLayer.clearLayers();
+  S.cps.forEach(c=>{c.marker=L.marker([c.lat,c.lng],{icon:cpIcon(c)}).addTo(cpLayer).bindTooltip(c.name);});
+  map.fitBounds(line.getBounds(),{padding:[20,20]});
+  S.idx=0; S.offCount=0; S.off=false; $('alert').classList.remove('on');
+  $('tlabel').textContent=`${S.name} / ${(cum[cum.length-1]/1000).toFixed(1)} km / TC ${S.cps.length}`;
+}
+const CPC={TC:'#e0432d',SS_START:'#3aa0e0',SS_STOP:'#e0432d',FUEL:'#3aa0e0',FINISH:'#222',OTHER:'#6b7a90'};
+const CPCH={TC:'T',SS_START:'S',SS_STOP:'■',FUEL:'F',FINISH:'G',OTHER:'●'};
+const cpIcon=c=>L.divIcon({className:'',html:`<div class="cp ${c.passed?'done':''}" style="background:${CPC[c.type]||CPC.OTHER}">${CPCH[c.type]||'●'}</div>`,iconSize:[24,24],iconAnchor:[12,12]});
+
+// ================= voice & sound =================
+let AC=null;
+function beep(freq,ms,times=1){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();let t=AC.currentTime;for(let k=0;k< times;k++){const o=AC.createOscillator(),g=AC.createGain();o.frequency.value=freq;o.connect(g);g.connect(AC.destination);g.gain.setValueAtTime(.4,t);g.gain.exponentialRampToValueAtTime(.001,t+ms/1000);o.start(t);o.stop(t+ms/1000);t+=ms/1000+.12;}}catch(e){}}
+function say(text){try{const u=new SpeechSynthesisUtterance(text);u.lang='ja-JP';u.rate=1.05;speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}}
+const vib=p=>navigator.vibrate&&navigator.vibrate(p);
+const DIRWORD={L:{slight:'左方向',turn:'左折',sharp:'鋭角に左折',U:'Uターン'},R:{slight:'右方向',turn:'右折',sharp:'鋭角に右折',U:'Uターン'}};
+const manWord=m=>DIRWORD[m.dir][m.kind];
+const ARROWS={
+  L:{slight:'M60 85 V40 L35 25',turn:'M60 85 V45 H25 M40 30 L25 45 L40 60',sharp:'M60 85 V40 L30 60 M32 42 L30 60 L48 62',U:'M35 85 V45 A15 15 0 0 1 65 45 V65 M50 55 L65 70 L80 55'},
+  R:{slight:'M40 85 V40 L65 25',turn:'M40 85 V45 H75 M60 30 L75 45 L60 60',sharp:'M40 85 V40 L70 60 M68 42 L70 60 L52 62',U:'M65 85 V45 A15 15 0 0 0 35 45 V65 M50 55 L35 70 L20 55'},
+  S:'M50 85 V25 M30 45 L50 25 L70 45', G:'M30 30 H70 V70 H30 Z M30 50 H70 M50 30 V70'};
+
+// ================= ETA =================
+function renderCpTimes(){
+  $('cptimes').innerHTML=S.cps.map((c,k)=>`<div class="opt"><span>${c.name}</span><input type="time" data-k="${k}" value="${S.targets[c.name]||''}"></div>`).join('')||'<p>ポイントがありません</p>';
+  $('cptimes').querySelectorAll('input').forEach(i=>i.onchange=()=>{ S.targets[S.cps[+i.dataset.k].name]=i.value; });
+}
+const hhmm=d=>d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');
+const mmss=ms=>{const m=Math.floor(ms/60000),s=Math.floor(ms%60000/1000);return (m>=60?Math.floor(m/60)+':'+String(m%60).padStart(2,'0')+':':m+':')+String(s).padStart(2,'0');};
+function avgSpeedMs(now,at){ // m/s over the last ~3 min of along-track progress, else assumed
+  S.hist.push({t:now,at}); while(S.hist.length&&now-S.hist[0].t>180000) S.hist.shift();
+  const h=S.hist[0]; const dt=(now-h.t)/1000, dd=at-h.at;
+  if(dt>=45&&dd>50) return dd/dt;
+  return +$('assume').value/3.6;
+}
+function diffLabel(etaDate,target){ if(!target) return ['',''];
+  const [th,tm]=target.split(':').map(Number); const tgt=new Date(etaDate); tgt.setHours(th,tm,0,0);
+  const m=Math.round((tgt-etaDate)/60000);
+  return [ (m>=0?'余裕 +':'遅れ ')+m+'分', m>=0?'early':'late' ];
+}
+function updateETA(now,at){
+  const v=avgSpeedMs(now,at); const total=S.cum[S.cum.length-1];
+  $('avgspd').textContent='平均 '+Math.round(v*3.6)+' km/h';
+  $('elapsed').textContent=S.startAt?mmss(now-S.startAt):'0:00';
+  const nc=S.cps.find(c=>!c.passed);
+  if(nc){ const eta=new Date(now+Math.max(0,nc.at-at)/v*1000); $('eta-cp').textContent=hhmm(eta); const [txt,cls]=diffLabel(eta,S.targets[nc.name]); $('eta-cpd').textContent=txt; $('eta-cp').className=cls; }
+  else { $('eta-cp').textContent='--:--'; $('eta-cpd').textContent=''; $('eta-cp').className=''; }
+  const g=new Date(now+Math.max(0,total-at)/v*1000); $('eta-goal').textContent=hhmm(g); $('eta-goald').textContent='残り '+fmt(total-at);
+}
+// ================= tracking =================
+function onFix(lat,lng,speedMs,ts){
+  const p=[lat,lng]; S.lastPos=p; car.setLatLng(p); if(!map.hasLayer(car)) car.addTo(map);
+  if(S.follow) map.setView(p,Math.max(map.getZoom(),15),{animate:false});
+  const lp=S.log[S.log.length-1]; if(!lp||distM([lp.lat,lp.lng],p)>=5||ts-lp.t>=10000){ S.log.push({lat,lng,t:ts}); $('btn-savelog').disabled=false; $('loginfo').textContent=`記録中：${S.log.length}点`; }
+  if(S.logOnly||!S.pts.length){ $('tlabel').textContent='記録中（ルートなし）'; $('speed').firstElementChild.textContent=Math.round(speedMs>0?speedMs*3.6:0); return; }
+  // speed
+  const kmh=speedMs!=null&&speedMs>=0?speedMs*3.6:(S.prev&&ts>S.prev.t?distM(S.prev.p,p)/((ts-S.prev.t)/1000)*3.6:0);
+  S.prev={p,t:ts}; $('speed').firstElementChild.textContent=Math.round(kmh);
+  // project: search window around idx, then whole track if far
+  const pts=S.pts; let best={d:1e9,i:0,t:0};
+  const scan=(a,b)=>{for(let i=Math.max(1,a);i< Math.min(pts.length,b);i++){const r=projectToSeg(p,pts[i-1],pts[i]);if(r.d< best.d)best={d:r.d,i,t:r.t};}};
+  scan(S.idx-20,S.idx+120); if(best.d>+$('offd').value*2) scan(0,pts.length);
+  const at=S.cum[best.i-1]+best.t*(S.cum[best.i]-S.cum[best.i-1]);
+  // off-route
+  const offLim=+$('offd').value;
+  if(best.d>offLim){ if(++S.offCount>=4&&!S.off){S.off=true;$('alert').classList.add('on');beep(330,250,3);vib([300,150,300]);say('ルートを外れています');} }
+  else{ S.offCount=0; if(S.off){S.off=false;$('alert').classList.remove('on');beep(880,120,1);say('ルートに戻りました');} }
+  // only advance along the track when on route (prevents skipping when off)
+  if(best.d<=offLim){ S.idx=best.i; doneLine.setLatLngs(pts.slice(0,best.i)); }
+  const pre=+$('pre').value;
+  // next maneuver
+  const nm=S.mans.find(m=>m.at>at-15);
+  if(nm){ const rem=nm.at-at; $('apath').setAttribute('d',ARROWS[nm.dir][nm.kind]); setDist(rem); $('tlabel').textContent=manWord(nm);
+    if(!nm.said500&&rem<=pre&&rem>150){nm.said500=true;say(`${pre>=1000?'1キロ':pre+'メートル'}先、${manWord(nm)}`);}
+    if(!nm.said100&&rem<=120){nm.said100=true;say(`まもなく${manWord(nm)}`);} }
+  else{ $('apath').setAttribute('d',ARROWS.G); setDist(S.cum[S.cum.length-1]-at); $('tlabel').textContent='ゴールまで'; }
+  // checkpoints
+  const nc=S.cps.find(c=>!c.passed);
+  if(nc){ const rem=nc.at-at; $('cpnext').innerHTML=`次の${nc.name}：<b>${fmt(rem)}</b>`;
+    if(!nc.said&&rem<=pre){nc.said=true;say(`${pre>=1000?'1キロ':pre+'メートル'}先、${nc.name}`);beep(660,150,2);}
+    if(rem<=40&&distM(p,[nc.lat,nc.lng])<80){nc.passed=true;nc.marker.setIcon(cpIcon(nc));say(`${nc.name}、通過`);beep(1040,180,1);vib(200);} }
+  else $('cpnext').innerHTML='全ポイント通過';
+  updateETA(Date.now(),at);
+}
+function setDist(m){const el=$('tdist');if(m>=1000)el.innerHTML=(m/1000).toFixed(1)+'<small>km</small>';else el.innerHTML=Math.max(0,Math.round(m/10)*10)+'<small>m</small>';}
+const fmt=m=>m>=1000?(m/1000).toFixed(1)+' km':Math.max(0,Math.round(m/10)*10)+' m';
+
+function start(logOnly){
+  S.logOnly=!!logOnly; if(!S.logOnly){ if(!S.route) return; prepare(); }
+  S.log=[]; $('btn-savelog').disabled=true; $('loginfo').textContent='';
+  S.hist=[]; S.startAt=Date.now();
+  S.running=true; $('btn-start').textContent='停止'; $('btn-start').className='stop'; $('sheet').style.display='none';
+  beep(880,80,1); say(S.logOnly?'記録を開始します':'案内を開始します');
+  if(navigator.wakeLock) navigator.wakeLock.request('screen').then(w=>S.wake=w).catch(()=>{});
+  if($('sim').checked&&!S.logOnly){ S.simD=0; S.sim=setInterval(()=>{ S.simD+=60/3.6; const pts=S.pts,cum=S.cum; if(S.simD>=cum[cum.length-1]){stop();return;}
+      let i=1;while(cum[i]< S.simD)i++; const t=(S.simD-cum[i-1])/(cum[i]-cum[i-1]); const p=[pts[i-1][0]+t*(pts[i][0]-pts[i-1][0]),pts[i-1][1]+t*(pts[i][1]-pts[i-1][1])];
+      onFix(p[0],p[1],60/3.6,Date.now()); },1000); }
+  else{ S.watch=navigator.geolocation.watchPosition(g=>onFix(g.coords.latitude,g.coords.longitude,g.coords.speed,g.timestamp),
+      e=>{$('tlabel').textContent='位置情報が取れません：'+e.message;},{enableHighAccuracy:true,maximumAge:500,timeout:15000}); }
+}
+function stop(){ S.running=false; if(S.watch!=null){navigator.geolocation.clearWatch(S.watch);S.watch=null;} if(S.sim){clearInterval(S.sim);S.sim=null;}
+  if(S.wake){S.wake.release().catch(()=>{});S.wake=null;} $('btn-start').textContent='開始'; $('btn-start').className='primary'; say('案内を終了しました'); }
+$('btn-start').onclick=()=>S.running?stop():start(false);
+$('btn-go').onclick=()=>start(false);
+$('btn-logonly').onclick=()=>{ $('btn-start').disabled=false; start(true); };
+$('btn-menu').onclick=()=>{$('sheet').style.display='flex';};
+$('btn-voice').onclick=()=>{beep(880,80,1);say('500メートル先、右折です');};
+
+// ================= log saving =================
+function logGPX(){ const name='drive-'+new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
+  const t=S.log.map(q=>`      <trkpt lat="${q.lat.toFixed(6)}" lon="${q.lng.toFixed(6)}"><time>${new Date(q.t).toISOString()}</time></trkpt>`).join('\n');
+  return {name, text:'<'+'?xml version="1.0" encoding="UTF-8"?'+'>\n<gpx version="1.1" creator="rally_nav_log" xmlns="http://www.topografix.com/GPX/1/1">\n  <trk><name>'+name+'</name><trkseg>\n'+t+'\n  </trkseg></trk>\n</gpx>'}; }
+$('btn-savelog').onclick=async function(){
+  if(S.log.length<2) return; const g=logGPX(); const file=new File([g.text],g.name+'.gpx',{type:'application/gpx+xml'});
+  try{ if(navigator.canShare&&navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:g.name}); return; } }catch(e){ if(e.name==='AbortError') return; }
+  const a=document.createElement('a'); a.href=URL.createObjectURL(file); a.download=file.name; a.click();
+};
+// ================= route loading =================
+function setRoute(name,txt){ try{ S.route=parseGPX(txt); S.name=name.replace(/\.gpx$/i,''); prepare(); $('btn-go').disabled=false; $('btn-start').disabled=false;
+  $('status').textContent=`${S.name}：${S.pts.length}点、曲がり角 ${S.mans.length}、ポイント ${S.cps.length}`; $('routes').innerHTML=`<div class="rt sel"><span class="grow">${S.name}.gpx</span></div>`; }catch(e){ $('status').textContent='GPXを読めません：'+e.message; } }
+function loadList(){}
+$('btn-file').onclick=()=>$('file').click();
+$('file').onchange=e=>{const f=e.target.files[0];if(!f)return;const fr=new FileReader();fr.onload=()=>setRoute(f.name,fr.result);fr.readAsText(f);e.target.value='';};
+$('dir').onchange=()=>S.route&&prepare();
+loadList();
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+</script>
+</body>
+</html>

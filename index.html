@@ -118,7 +118,7 @@
 <script>
 // ================= state =================
 const S={route:null, name:'', pts:[], cum:[], mans:[], cps:[], idx:0, running:false, follow:true,
-  offCount:0, off:false, watch:null, sim:null, simD:0, lastPos:null, lastT:0, wake:null, hist:[], startAt:0, targets:{}, log:[], logOnly:false};
+  offCount:0, off:false, watch:null, sim:null, simD:0, lastPos:null, lastT:0, wake:null, hist:[], startAt:0, targets:{}, log:[], logOnly:false, sm:{}, startAt0:null};
 const $=id=>document.getElementById(id);
 
 // ================= map =================
@@ -197,15 +197,20 @@ const ARROWS={
 // ================= ETA =================
 function renderCpTimes(){
   $('cptimes').innerHTML=S.cps.map((c,k)=>`<div class="opt"><span>${c.name}</span><input type="time" data-k="${k}" value="${S.targets[c.name]||''}"></div>`).join('')||'<p>ポイントがありません</p>';
-  $('cptimes').querySelectorAll('input').forEach(i=>i.onchange=()=>{ S.targets[S.cps[+i.dataset.k].name]=i.value; });
+  $('cptimes').querySelectorAll('input').forEach(i=>i.onchange=()=>{ S.targets[S.cps[+i.dataset.k].name]=i.value; saveState(); });
 }
 const hhmm=d=>d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');
 const mmss=ms=>{const m=Math.floor(ms/60000),s=Math.floor(ms%60000/1000);return (m>=60?Math.floor(m/60)+':'+String(m%60).padStart(2,'0')+':':m+':')+String(s).padStart(2,'0');};
-function avgSpeedMs(now,at){ // m/s over the last ~3 min of along-track progress, else assumed
-  S.hist.push({t:now,at}); while(S.hist.length&&now-S.hist[0].t>180000) S.hist.shift();
-  const h=S.hist[0]; const dt=(now-h.t)/1000, dd=at-h.at;
-  if(dt>=45&&dd>50) return dd/dt;
-  return +$('assume').value/3.6;
+function avgSpeedMs(now,at){ // 直近10分の実進捗から算出。短い停止では大きく変わらないようにする
+  S.hist.push({t:now,at}); while(S.hist.length&&now-S.hist[0].t>600000) S.hist.shift();
+  const first=S.hist[0]; const dt=(now-first.t)/1000, dd=at-first.at;
+  const floor=12/3.6, assume=+$('assume').value/3.6;
+  if(dt>=60&&dd>=300) return Math.max(floor, dd/dt);
+  if(S.startAt&&S.startAt0!=null){ const dt2=(now-S.startAt)/1000, dd2=at-S.startAt0; if(dt2>=60&&dd2>=300) return Math.max(floor, dd2/dt2); }
+  return assume;
+}
+function smoothSec(key,sec){ // 到着予想の残り秒数をなだらかに変化させる（急な跳ねを抑える）
+  const a=0.12; if(S.sm[key]==null||Math.abs(S.sm[key]-sec)>1800) S.sm[key]=sec; else S.sm[key]=S.sm[key]*(1-a)+sec*a; return S.sm[key];
 }
 function diffLabel(etaDate,target){ if(!target) return ['',''];
   const [th,tm]=target.split(':').map(Number); const tgt=new Date(etaDate); tgt.setHours(th,tm,0,0);
@@ -213,13 +218,14 @@ function diffLabel(etaDate,target){ if(!target) return ['',''];
   return [ (m>=0?'余裕 +':'遅れ ')+m+'分', m>=0?'early':'late' ];
 }
 function updateETA(now,at){
+  if(S.startAt0==null) S.startAt0=at;
   const v=avgSpeedMs(now,at); const total=S.cum[S.cum.length-1];
-  $('avgspd').textContent='平均 '+Math.round(v*3.6)+' km/h';
+  $('avgspd').textContent='計算用 '+Math.round(v*3.6)+' km/h';
   $('elapsed').textContent=S.startAt?mmss(now-S.startAt):'0:00';
   const nc=S.cps.find(c=>!c.passed);
-  if(nc){ const eta=new Date(now+Math.max(0,nc.at-at)/v*1000); $('eta-cp').textContent=hhmm(eta); const [txt,cls]=diffLabel(eta,S.targets[nc.name]); $('eta-cpd').textContent=txt; $('eta-cp').className=cls; }
+  if(nc){ const eta=new Date(now+smoothSec('cp'+nc.name,Math.max(0,nc.at-at)/v)*1000); $('eta-cp').textContent=hhmm(eta); const [txt,cls]=diffLabel(eta,S.targets[nc.name]); $('eta-cpd').textContent=txt; $('eta-cp').className=cls; }
   else { $('eta-cp').textContent='--:--'; $('eta-cpd').textContent=''; $('eta-cp').className=''; }
-  const g=new Date(now+Math.max(0,total-at)/v*1000); $('eta-goal').textContent=hhmm(g); $('eta-goald').textContent='残り '+fmt(total-at);
+  const g=new Date(now+smoothSec('goal',Math.max(0,total-at)/v)*1000); $('eta-goal').textContent=hhmm(g); $('eta-goald').textContent='残り '+fmt(total-at);
 }
 // ================= tracking =================
 function onFix(lat,lng,speedMs,ts){
@@ -262,9 +268,9 @@ const fmt=m=>m>=1000?(m/1000).toFixed(1)+' km':Math.max(0,Math.round(m/10)*10)+'
 function start(logOnly){
   S.logOnly=!!logOnly; if(!S.logOnly){ if(!S.route) return; prepare(); }
   S.log=[]; $('btn-savelog').disabled=true; $('loginfo').textContent='';
-  S.hist=[]; S.startAt=Date.now();
+  S.hist=[]; S.sm={}; S.startAt=Date.now(); S.startAt0=null;
   S.running=true; $('btn-start').textContent='停止'; $('btn-start').className='stop'; $('sheet').style.display='none';
-  beep(880,80,1); say(S.logOnly?'記録を開始します':'案内を開始します');
+  beep(880,80,1); say(S.logOnly?'記録を開始します':'案内を開始します'); saveState();
   if(navigator.wakeLock) navigator.wakeLock.request('screen').then(w=>S.wake=w).catch(()=>{});
   if($('sim').checked&&!S.logOnly){ S.simD=0; S.sim=setInterval(()=>{ S.simD+=60/3.6; const pts=S.pts,cum=S.cum; if(S.simD>=cum[cum.length-1]){stop();return;}
       let i=1;while(cum[i]< S.simD)i++; const t=(S.simD-cum[i-1])/(cum[i]-cum[i-1]); const p=[pts[i-1][0]+t*(pts[i][0]-pts[i-1][0]),pts[i-1][1]+t*(pts[i][1]-pts[i-1][1])];
@@ -273,7 +279,7 @@ function start(logOnly){
       e=>{$('tlabel').textContent='位置情報が取れません：'+e.message;},{enableHighAccuracy:true,maximumAge:500,timeout:15000}); }
 }
 function stop(){ S.running=false; if(S.watch!=null){navigator.geolocation.clearWatch(S.watch);S.watch=null;} if(S.sim){clearInterval(S.sim);S.sim=null;}
-  if(S.wake){S.wake.release().catch(()=>{});S.wake=null;} $('btn-start').textContent='開始'; $('btn-start').className='primary'; say('案内を終了しました'); }
+  if(S.wake){S.wake.release().catch(()=>{});S.wake=null;} $('btn-start').textContent='開始'; $('btn-start').className='primary'; say('案内を終了しました'); saveState(); }
 $('btn-start').onclick=()=>S.running?stop():start(false);
 $('btn-go').onclick=()=>start(false);
 $('btn-logonly').onclick=()=>{ $('btn-start').disabled=false; start(true); };
@@ -290,12 +296,38 @@ $('btn-savelog').onclick=async function(){
   const a=document.createElement('a'); a.href=URL.createObjectURL(file); a.download=file.name; a.click();
 };
 // ================= route loading =================
-function setRoute(name,txt){ try{ S.route=parseGPX(txt); S.name=name.replace(/\.gpx$/i,''); prepare(); $('btn-go').disabled=false; $('btn-start').disabled=false;
-  $('status').textContent=`${S.name}：${S.pts.length}点、曲がり角 ${S.mans.length}、ポイント ${S.cps.length}`; $('routes').innerHTML=`<div class="rt sel"><span class="grow">${S.name}.gpx</span></div>`; }catch(e){ $('status').textContent='GPXを読めません：'+e.message; } }
+function setRoute(name,txt){ try{ S.route=parseGPX(txt); S.gpxText=txt; S.name=name.replace(/\.gpx$/i,''); prepare(); $('btn-go').disabled=false; $('btn-start').disabled=false;
+  $('status').textContent=`${S.name}：${S.pts.length}点、曲がり角 ${S.mans.length}、ポイント ${S.cps.length}`; $('routes').innerHTML=`<div class="rt sel"><span class="grow">${S.name}.gpx</span></div>`; if(typeof saveState==='function') saveState(); }catch(e){ $('status').textContent='GPXを読めません：'+e.message; } }
 function loadList(){}
 $('btn-file').onclick=()=>$('file').click();
 $('file').onchange=e=>{const f=e.target.files[0];if(!f)return;const fr=new FileReader();fr.onload=()=>setRoute(f.name,fr.result);fr.readAsText(f);e.target.value='';};
 $('dir').onchange=()=>S.route&&prepare();
+// ================= 状態の保存・復元（更新しても消えないように） =================
+const KEY='rallynav-state';
+function saveState(){ try{ localStorage.setItem(KEY,JSON.stringify({
+  gpx:S.gpxText||null, name:S.name, targets:S.targets,
+  set:{dir:$('dir').value,pre:$('pre').value,offd:$('offd').value,assume:$('assume').value},
+  run:{running:S.running&&!S.sim, logOnly:S.logOnly, startAt:S.startAt, passed:S.cps.filter(c=>c.passed).map(c=>c.name), said:S.cps.filter(c=>c.said).map(c=>c.name),
+       mans:S.mans.map(m=>[m.said500,m.said100]), log:S.log.slice(-6000)}
+})); }catch(e){} }
+function restoreState(){
+  let st=null; try{ st=JSON.parse(localStorage.getItem(KEY)||'null'); }catch(e){} if(!st) return;
+  if(st.set){ $('dir').value=st.set.dir||'fwd'; $('pre').value=st.set.pre||'500'; $('offd').value=st.set.offd||'40'; $('assume').value=st.set.assume||'40'; }
+  S.targets=st.targets||{};
+  if(st.gpx){ setRoute(st.name+'.gpx',st.gpx); }
+  if(st.run&&(st.run.log||[]).length){ S.log=st.run.log; $('btn-savelog').disabled=false; $('loginfo').textContent=`前回の記録：${S.log.length}点（保存できます）`; }
+  if(st.run&&st.run.running){
+    const b=document.createElement('button'); b.className='primary'; b.textContent='▶ 前回の案内を再開（更新前の続きから）'; b.style.marginTop='10px';
+    b.onclick=()=>{ b.remove(); if(st.run.logOnly){ start(true); return; }
+      const keepLog=S.log; start(false); S.log=keepLog; S.startAt=st.run.startAt||Date.now();
+      S.cps.forEach(c=>{ if(st.run.passed.includes(c.name)){c.passed=true;c.marker.setIcon(cpIcon(c));} if(st.run.said.includes(c.name)) c.said=true; });
+      (st.run.mans||[]).forEach((m,i)=>{ if(S.mans[i]){S.mans[i].said500=m[0];S.mans[i].said100=m[1];} }); saveState(); };
+    $('sheet').insertBefore(b,$('status'));
+  }
+}
+setInterval(()=>{ if(S.running) saveState(); },10000);
+['dir','pre','offd','assume'].forEach(id=>$(id).addEventListener('change',saveState));
+restoreState();
 loadList();
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 </script>

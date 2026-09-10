@@ -89,8 +89,8 @@
 
   <div id="sheet">
     <h1>ラリーナビ</h1>
-    <p>GPXファイル（ルート作成ツールで保存したもの）を開いて開始します。RALLYSTREAMは別の端末か裏で動かしたままで大丈夫です。</p>
-    <div class="row"><button id="btn-file" class="primary">GPXを開く</button><input type="file" id="file" accept=".gpx,application/gpx+xml,application/xml,text/xml" style="display:none"></div>
+    <p>GPXファイル（ルート作成ツールで保存したもの）を開いて開始します。LINEやメールで受け取ったGPXは、一度「ファイルに保存」してから選ぶと確実です。Googleドライブ上のファイルは、ドライブアプリで一度開いておくと読めます。</p>
+    <div class="row"><button id="btn-file" class="primary">GPXを開く</button><input type="file" id="file" style="display:none"></div>
     <div id="routes"></div>
     <div style="margin-top:14px">
       <div class="opt"><span>走る向き</span><select id="dir"><option value="fwd">記録された順</option><option value="rev">反転する</option></select></div>
@@ -300,7 +300,11 @@ function setRoute(name,txt){ try{ S.route=parseGPX(txt); S.gpxText=txt; S.name=n
   $('status').textContent=`${S.name}：${S.pts.length}点、曲がり角 ${S.mans.length}、ポイント ${S.cps.length}`; $('routes').innerHTML=`<div class="rt sel"><span class="grow">${S.name}.gpx</span></div>`; if(typeof saveState==='function') saveState(); }catch(e){ $('status').textContent='GPXを読めません：'+e.message; } }
 function loadList(){}
 $('btn-file').onclick=()=>$('file').click();
-$('file').onchange=e=>{const f=e.target.files[0];if(!f)return;const fr=new FileReader();fr.onload=()=>setRoute(f.name,fr.result);fr.readAsText(f);e.target.value='';};
+$('file').onchange=e=>{const f=e.target.files[0];if(!f)return; $('status').textContent=`読み込み中：${f.name}（${Math.round(f.size/1024)} KB）`;
+  const fr=new FileReader();
+  fr.onload=()=>{ const txt=fr.result||''; if(txt.trim().length<50||!/<trkpt/i.test(txt)){ $('status').textContent=`${f.name} にルートが入っていません（中身 ${txt.length} 文字）。クラウド上のファイルがまだダウンロードされていない可能性があります。ファイルアプリで一度開いてから選び直してください。前のルートのままです。`; return; } setRoute(f.name,txt); };
+  fr.onerror=()=>{ $('status').textContent=`${f.name} を読めませんでした。ファイルアプリに保存してから選んでください。前のルートのままです。`; };
+  fr.readAsText(f); e.target.value='';};
 $('dir').onchange=()=>S.route&&prepare();
 // ================= 状態の保存・復元（更新しても消えないように） =================
 const KEY='rallynav-state';

@@ -399,8 +399,26 @@ function restoreState(){
 setInterval(()=>{ if(S.running) saveState(); },10000);
 ['startmode','dir','pre','offd','assume'].forEach(id=>$(id).addEventListener('change',saveState));
 restoreState();
-loadFromLink();
+if(!loadFromLink()) loadDefaultRoute();
 loadList();
+// ================= 既定ルート（GitHub上の default.gpx を自動配信） =================
+async function loadDefaultRoute(){
+  try{
+    let cfg={gpx:'default.gpx',join:true};
+    try{ const r=await fetch('default.json',{cache:'no-store'}); if(r.ok) cfg=Object.assign(cfg,await r.json()); }catch(e){}
+    const r=await fetch(cfg.gpx,{cache:'no-store'}); if(!r.ok) return;
+    const txt=await r.text(); if(!/<trkpt/i.test(txt)) return;
+    let sig=0; for(let i=0;i< txt.length;i++) sig=(sig*31+txt.charCodeAt(i))|0; sig=String(sig);
+    const seen=localStorage.getItem('rallynav-default-sig');
+    if(seen===sig && S.route) return; // 既に取り込み済みで、別ルートを使っているかもしれないので触らない
+    if(S.running) return;
+    const nm=(txt.match(/<name>([^<]*)<\/name>/)||[])[1]||'default';
+    $('startmode').value=cfg.join?'join':'fixed';
+    setRoute(nm+'.gpx',txt);
+    localStorage.setItem('rallynav-default-sig',sig);
+    $('status').textContent=`最新のルートを読み込みました：${nm}（${(S.cum[S.cum.length-1]/1000).toFixed(1)} km${cfg.join?'・合流モード':''}）。「このルートで始める」を押してください。`;
+  }catch(e){}
+}
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 </script>
 </body>

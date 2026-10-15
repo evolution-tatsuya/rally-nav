@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="rally_route_trace" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata><name>26.11.1 FD2OMT</name><time>2026-10-15T13:26:43.552Z</time></metadata>
+  <wpt lat="34.665644" lon="135.398812"><name>TC 1</name><type>TC</type></wpt>
+  <wpt lat="34.663914" lon="135.398319"><name>TC 2</name><type>TC</type></wpt>
+  <wpt lat="34.666350" lon="135.390358"><name>TC 3</name><type>TC</type></wpt>
+  <wpt lat="34.666641" lon="135.393941"><name>フィニッシュ</name><type>FINISH</type></wpt>
+  <trk><name>26.11.1 FD2OMT</name><trkseg>
+      <trkpt lat="34.665635" lon="135.398812"></trkpt>
+      <trkpt lat="34.665646" lon="135.398779"></trkpt>
+      <trkpt lat="34.665278" lon="135.398697"></trkpt>
+      <trkpt lat="34.665072" lon="135.398649"></trkpt>
+      <trkpt lat="34.664063" lon="135.398412"></trkpt>
+      <trkpt lat="34.663938" lon="135.398382"></trkpt>
+      <trkpt lat="34.663946" lon="135.398328"></trkpt>
+      <trkpt lat="34.663955" lon="135.398270"></trkpt>
+      <trkpt lat="34.664214" lon="135.396594"></trkpt>
+      <trkpt lat="34.664237" lon="135.396443"></trkpt>
+      <trkpt lat="34.664280" lon="135.396164"></trkpt>
+      <trkpt lat="34.664306" lon="135.395940"></trkpt>
+      <trkpt lat="34.664303" lon="135.395634"></trkpt>
+      <trkpt lat="34.664270" lon="135.395364"></trkpt>
+      <trkpt lat="34.664246" lon="135.395239"></trkpt>
+      <trkpt lat="34.664226" lon="135.395170"></trkpt>
+      <trkpt lat="34.664187" lon="135.395044"></trkpt>
+      <trkpt lat="34.664139" lon="135.394889"></trkpt>
+      <trkpt lat="34.664089" lon="135.394704"></trkpt>
+      <trkpt lat="34.664081" lon="135.394672"></trkpt>
+      <trkpt lat="34.664059" lon="135.394567"></trkpt>
+      <trkpt lat="34.664029" lon="135.394407"></trkpt>
+      <trkpt lat="34.664006" lon="135.394241"></trkpt>
+      <trkpt lat="34.663993" lon="135.394095"></trkpt>
+      <trkpt lat="34.663982" lon="135.393919"></trkpt>
+      <trkpt lat="34.663980" lon="135.393796"></trkpt>
+      <trkpt lat="34.663981" lon="135.393609"></trkpt>
+      <trkpt lat="34.663989" lon="135.393452"></trkpt>
+      <trkpt lat="34.664004" lon="135.393284"></trkpt>
+      <trkpt lat="34.664026" lon="135.393122"></trkpt>
+      <trkpt lat="34.664056" lon="135.392942"></trkpt>
+      <trkpt lat="34.664108" lon="135.392710"></trkpt>
+      <trkpt lat="34.664152" lon="135.392547"></trkpt>
+      <trkpt lat="34.664183" lon="135.392448"></trkpt>
+      <trkpt lat="34.664209" lon="135.392364"></trkpt>
+      <trkpt lat="34.664253" lon="135.392243"></trkpt>
+      <trkpt lat="34.664293" lon="135.392145"></trkpt>
+      <trkpt lat="34.664357" lon="135.392004"></trkpt>
+      <trkpt lat="34.664422" lon="135.391863"></trkpt>
+      <trkpt lat="34.664529" lon="135.391684"></trkpt>
+      <trkpt lat="34.664680" lon="135.391446"></trkpt>
+      <trkpt lat="34.664779" lon="135.391326"></trkpt>
+      <trkpt lat="34.664891" lon="135.391190"></trkpt>
+      <trkpt lat="34.665035" lon="135.391033"></trkpt>
+      <trkpt lat="34.665066" lon="135.391000"></trkpt>
+      <trkpt lat="34.665142" lon="135.390931"></trkpt>
+      <trkpt lat="34.665218" lon="135.390862"></trkpt>
+      <trkpt lat="34.665422" lon="135.390705"></trkpt>
+      <trkpt lat="34.665581" lon="135.390607"></trkpt>
+      <trkpt lat="34.665813" lon="135.390483"></trkpt>
+      <trkpt lat="34.665953" lon="135.390422"></trkpt>
+      <trkpt lat="34.666155" lon="135.390349"></trkpt>
+      <trkpt lat="34.666270" lon="135.390329"></trkpt>
+      <trkpt lat="34.666318" lon="135.390339"></trkpt>
+      <trkpt lat="34.666341" lon="135.390358"></trkpt>
+      <trkpt lat="34.666350" lon="135.390365"></trkpt>
+      <trkpt lat="34.666373" lon="135.390400"></trkpt>
+      <trkpt lat="34.666380" lon="135.390472"></trkpt>
+      <trkpt lat="34.666413" lon="135.390864"></trkpt>
+      <trkpt lat="34.666551" lon="135.392580"></trkpt>
+      <trkpt lat="34.666565" lon="135.392760"></trkpt>
+      <trkpt lat="34.666660" lon="135.393939"></trkpt>
+  </trkseg></trk>
+</gpx>

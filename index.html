@@ -35,7 +35,7 @@
   #alert{display:none;background:var(--red);color:#fff;font-weight:700;text-align:center;padding:10px;font-size:18px}
   #alert.on{display:block}
   #mapwrap{flex:1;position:relative;overflow:hidden}
-  #map{position:absolute;left:-40%;top:-40%;width:180%;height:180%;transform-origin:50% 50%;will-change:transform}
+  #map{position:absolute;left:-40%;top:-40%;width:180%;height:180%;transform-origin:50% 50%;will-change:transform;transition:transform .35s linear}
   .car{position:relative}
   .car .hd{position:absolute;left:50%;top:-14px;width:0;height:0;margin-left:-7px;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:12px solid var(--warn)}
   .carwrap{transform-origin:50% 50%}
@@ -136,7 +136,9 @@ const $=id=>document.getElementById(id);
 // ================= map =================
 const map=L.map('map',{zoomControl:false,attributionControl:false}).setView([35.2,135.95],11);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
-setTimeout(()=>map.invalidateSize(),300);
+function fitMapBox(){ const wr=$('mapwrap'), m=$('map'); const w=wr.clientWidth,h=wr.clientHeight; if(!w||!h) return;
+  const d=Math.ceil(Math.hypot(w,h))+40; m.style.width=m.style.height=d+'px'; m.style.left=((w-d)/2)+'px'; m.style.top=((h-d)/2)+'px'; map.invalidateSize(); }
+setTimeout(fitMapBox,300); window.addEventListener('resize',()=>setTimeout(fitMapBox,200));
 const line=L.polyline([],{color:'#2f6bff',weight:6,opacity:.9}).addTo(map);
 const doneLine=L.polyline([],{color:'#5b6b8a',weight:6,opacity:.7}).addTo(map);
 const approachLine=L.polyline([],{color:'#f2b441',weight:5,opacity:.9,dashArray:'10 10'}).addTo(map);

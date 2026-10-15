@@ -39,6 +39,9 @@
   .car{position:relative}
   .car .hd{position:absolute;left:50%;top:-14px;width:0;height:0;margin-left:-7px;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:12px solid var(--warn)}
   .carwrap{transform-origin:50% 50%}
+  #north{position:absolute;left:10px;top:10px;z-index:900;width:44px;height:44px;border-radius:50%;background:rgba(14,19,28,.85);border:1px solid var(--line);display:grid;place-items:center;pointer-events:none}
+  #north svg{width:36px;height:36px;transform-origin:50% 50%}
+  #hdgtxt{position:absolute;left:60px;top:18px;z-index:900;font-size:13px;color:var(--mute);background:rgba(14,19,28,.85);padding:3px 8px;border-radius:8px;pointer-events:none}
   /* --- foot --- */
   #foot{background:var(--panel);border-top:1px solid var(--line);padding:8px 10px calc(8px + env(safe-area-inset-bottom));display:flex;gap:8px;align-items:center}
   button{background:var(--line);color:var(--text);border:0;border-radius:10px;padding:12px 14px;font:inherit;font-size:15px;font-weight:600;flex:1}
@@ -84,7 +87,10 @@
     </div>
   </div>
   <div id="alert">ルートを外れています</div>
-  <div id="mapwrap"><div id="map"></div></div>
+  <div id="mapwrap"><div id="map"></div>
+    <div id="north"><svg id="northsvg" viewBox="0 0 40 40"><polygon points="20,4 26,22 20,18 14,22" fill="#e0432d"/><polygon points="20,36 26,18 20,22 14,18" fill="#8e9bb3"/><text x="20" y="13" font-size="8" fill="#fff" text-anchor="middle" font-weight="700">N</text></svg></div>
+    <div id="hdgtxt">方位 --°</div>
+  </div>
   <div id="foot">
     <button id="btn-menu" class="small">ルート</button>
     <button id="btn-follow" class="small">追従</button>
@@ -124,7 +130,7 @@
 <script>
 // ================= state =================
 const S={route:null, name:'', pts:[], cum:[], mans:[], cps:[], idx:0, running:false, follow:true,
-  offCount:0, off:false, watch:null, sim:null, simD:0, lastPos:null, lastT:0, wake:null, hist:[], startAt:0, targets:{}, log:[], logOnly:false, sm:{}, startAt0:null, headUp:true, hdg:0, mapRot:0, approach:null, joinIdx:0, joinAt:0, joined:true, pendingJoin:false};
+  offCount:0, off:false, watch:null, sim:null, simD:0, lastPos:null, lastT:0, wake:null, hist:[], startAt:0, targets:{}, log:[], logOnly:false, sm:{}, startAt0:null, headUp:true, hdg:0, mapRot:0, compass:null, compassT:0, approach:null, joinIdx:0, joinAt:0, joined:true, pendingJoin:false};
 const $=id=>document.getElementById(id);
 
 // ================= map =================
@@ -243,13 +249,32 @@ async function osrmApproach(a,b){
   const j=await r.json(); if(j.code!=='Ok') throw new Error(j.code);
   const pts=j.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]); if(pts.length<2) throw new Error('empty'); return pts;
 }
+// ================= コンパス（停車中・低速時の向き） =================
+function onOrient(e){
+  let h=null;
+  if(typeof e.webkitCompassHeading==='number'&&!isNaN(e.webkitCompassHeading)) h=e.webkitCompassHeading;           // iOS
+  else if(e.absolute&&typeof e.alpha==='number') h=(360-e.alpha)%360;                                             // Android
+  if(h==null) return;
+  const so=(screen.orientation&&screen.orientation.angle)||window.orientation||0; h=(h+so+360)%360;
+  S.compass=h; S.compassT=Date.now();
+  // 停車中（GPSの更新が止まっている間）もコンパスで回す
+  if(S.running&&!S._fastMoving){ let d=((h-S.hdg+540)%360)-180; if(Math.abs(d)>1.5){ S.hdg=(S.hdg+d*0.25+360)%360; applyRotation(); if(S.follow&&S.lastPos){ map.setView(S.lastPos,map.getZoom(),{animate:false}); if(S.headUp){ const dd=$('mapwrap').clientHeight*0.28, hr=toRad(S.hdg); map.panBy([Math.sin(hr)*dd,-Math.cos(hr)*dd],{animate:false}); } } } }
+}
+function startCompass(){
+  if(S._compassOn) return;
+  const attach=()=>{ S._compassOn=true; window.addEventListener('deviceorientationabsolute',onOrient,true); window.addEventListener('deviceorientation',onOrient,true); };
+  try{ if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
+      DeviceOrientationEvent.requestPermission().then(r=>{ if(r==='granted') attach(); }).catch(()=>{}); }
+    else attach(); }catch(e){}
+}
 // ================= 進行方向アップ表示 =================
 function applyRotation(){
   S.mapRot=S.headUp?-S.hdg:0;
   $('map').style.transform='rotate('+S.mapRot+'deg)';
-  const cw=document.getElementById('carwrap'); if(cw) cw.style.transform='rotate('+((S.hdg+S.mapRot+360)%360)+'deg)';
+  const cw=document.getElementById('carwrap'); if(cw) cw.style.transform='rotate('+Math.round(S.hdg)+'deg)'; // 地図の回転を継承するので実方位をそのまま
   document.querySelectorAll('.cp').forEach(el=>el.style.transform='rotate('+(-S.mapRot)+'deg)');
   $('btn-headup').textContent=S.headUp?'進行方向↑':'北が上';
+  $('northsvg').style.transform='rotate('+S.mapRot+'deg)'; $('hdgtxt').textContent='方位 '+Math.round(S.hdg)+'°'+(S.headUp?'（地図回転）':'（北が上）');
 }
 $('btn-headup').onclick=()=>{ S.headUp=!S.headUp; applyRotation(); if(S.lastPos&&S.follow) map.setView(S.lastPos,map.getZoom(),{animate:false}); saveState(); };
 // ================= tracking =================
@@ -258,7 +283,9 @@ function onFix(lat,lng,speedMs,ts,headingDeg){
   // 進行方向：GPSのheadingが取れればそれ、なければ直前位置からの方位（時速7km以上のときだけ更新）
   let hd=null; if(headingDeg!=null&&!isNaN(headingDeg)&&headingDeg>=0&&speedMs>2) hd=headingDeg;
   else if(S.prev&&distM(S.prev.p,p)>=4&&ts>S.prev.t&&distM(S.prev.p,p)/((ts-S.prev.t)/1000)>2) hd=bearing(S.prev.p,p);
-  if(hd!=null){ let d=((hd-S.hdg+540)%360)-180; S.hdg=(S.hdg+d*0.5+360)%360; }
+  else if(S.compass!=null&&Date.now()-S.compassT<3000) hd=S.compass;   // 低速・停車中はコンパス
+  S._fastMoving=(speedMs>2)||(S.prev&&ts>S.prev.t&&distM(S.prev.p,p)/((ts-S.prev.t)/1000)>2);
+  if(hd!=null){ if(!S.hdgInit){ S.hdg=hd; S.hdgInit=true; } else { let d=((hd-S.hdg+540)%360)-180; S.hdg=(S.hdg+d*0.5+360)%360; } }
   applyRotation();
   if(S.follow){ map.setView(p,Math.max(map.getZoom(),15),{animate:false});
     if(S.headUp){ const d=$('mapwrap').clientHeight*0.28, hr=toRad(S.hdg); map.panBy([Math.sin(hr)*d,-Math.cos(hr)*d],{animate:false}); } }
@@ -313,7 +340,8 @@ function start(logOnly){
   S.logOnly=!!logOnly; S.approach=null; S.joined=true; S.pendingJoin=false;
   if(!S.logOnly){ if(!S.route) return; if($('startmode').value==='join'&&!$('sim').checked){ S.joined=false; S.pendingJoin=true; } prepare(); }
   S.log=[]; $('btn-savelog').disabled=true; $('loginfo').textContent='';
-  S.hist=[]; S.sm={}; S.startAt=Date.now(); S.startAt0=null;
+  S.hist=[]; S.sm={}; S.startAt=Date.now(); S.startAt0=null; S.hdgInit=false;
+  startCompass();
   S.running=true; $('btn-start').textContent='停止'; $('btn-start').className='stop'; $('sheet').style.display='none';
   beep(880,80,1); say(S.logOnly?'記録を開始します':S.pendingJoin?'現在地からTC1までのルートを計算します':'案内を開始します'); saveState();
   if(navigator.wakeLock) navigator.wakeLock.request('screen').then(w=>S.wake=w).catch(()=>{});
